@@ -1,0 +1,25 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[[source]]
+url = "https://download.pytorch.org/whl/cu121"
+verify_ssl = true
+name = "pytorch"
+
+[packages]
+speechrecognition = "*"
+pyaudio = "*"
+"pyannote.audio" = "*"
+python-dotenv = "*"
+numpy = "*"
+torch = {version = "*", index = "pytorch"}
+torchvision = {version = "*", index = "pytorch"}
+torchaudio = {version = "*", index = "pytorch"}
+openai-whisper = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11"
