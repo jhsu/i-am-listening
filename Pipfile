@@ -4,9 +4,19 @@ verify_ssl = true
 name = "pypi"
 
 [[source]]
+url = "https://pypi.ngc.nvidia.com"
+verify_ssl = true
+name = "nvidia"
+
+[[source]]
 url = "https://download.pytorch.org/whl/cu121"
 verify_ssl = true
-name = "pytorch"
+name = "pytorch_cu121"
+
+[[source]]
+url = "https://download.pytorch.org/whl/cpu/"
+verify_ssl = true
+name = "pytorch_cpu"
 
 [packages]
 speechrecognition = "*"
@@ -14,10 +24,18 @@ pyaudio = "*"
 "pyannote.audio" = "*"
 python-dotenv = "*"
 numpy = "*"
-torch = {version = "*", index = "pytorch"}
-torchvision = {version = "*", index = "pytorch"}
-torchaudio = {version = "*", index = "pytorch"}
 openai-whisper = "*"
+
+[torch_cpu]
+torch = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
+torchaudio = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
+torchvision = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
+
+[torch_cu121]
+nvidia-cuda-runtime-cu12={version="*", index="nvidia"}
+torch = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
+torchaudio = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
+torchvision = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
 
 [dev-packages]
 

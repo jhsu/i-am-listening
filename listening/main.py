@@ -1,11 +1,13 @@
 import os
 import time
+from typing import Callable, Optional
 
 import numpy as np
 import pyaudio  # noqa: F401
 import speech_recognition as sr
 import torch
 from dotenv import load_dotenv
+from notetaker import NoteTaker
 from pyannote.audio import Pipeline
 from whisper import Whisper, load_model
 
@@ -18,7 +20,10 @@ pipeline = Pipeline.from_pretrained(
 
 
 def process_segment(
-    audio_segment: sr.AudioData, audio_model: Whisper, sample_rate: int = 16000
+    audio_segment: sr.AudioData,
+    audio_model: Whisper,
+    sample_rate: int = 16000,
+    callback: Optional[Callable] = None,
 ) -> None:
     audio_data = np.frombuffer(audio_segment.get_wav_data(), dtype=np.int16)
 
@@ -46,15 +51,19 @@ def process_segment(
         result = audio_model.transcribe(audio_np, fp16=torch.cuda.is_available())
         if isinstance(result["text"], str):
             text = result["text"].strip()
-            print(f"received text: {text}")
-    else:
-        print("No speech detected")
+            if callback and text != "":
+                callback(text)
+            print(f"received text: '{text}'")
 
 
 def main() -> None:
     recognizer: sr.Recognizer = sr.Recognizer()
     sample_rate = 16000
     mic: sr.Microphone = sr.Microphone(sample_rate=sample_rate)
+
+    notetaker = NoteTaker(
+        db_path=os.path.join(os.getcwd(), "notes.db"), debounce_time=1
+    )
 
     with mic as source:
         recognizer.adjust_for_ambient_noise(source)
@@ -66,18 +75,27 @@ def main() -> None:
 
     audio_model = load_model(model)
 
-    while True:
-        with mic as source:
-            try:
-                # Adjust the duration parameter to control how long it listens before processing
-                audio: sr.AudioData = recognizer.listen(
-                    source, timeout=5.0, phrase_time_limit=5.0
-                )
-                process_segment(audio, sample_rate=sample_rate, audio_model=audio_model)
-            except sr.WaitTimeoutError:
-                pass  # Timeout reached, no speech detected
+    try:
+        while True:
+            with mic as source:
+                try:
+                    # Adjust the duration parameter to control how long it listens before processing
+                    audio: sr.AudioData = recognizer.listen(
+                        source, timeout=5.0, phrase_time_limit=5.0
+                    )
+                    process_segment(
+                        audio,
+                        sample_rate=sample_rate,
+                        audio_model=audio_model,
+                        callback=notetaker.append,
+                    )
+                except sr.WaitTimeoutError:
+                    pass  # Timeout reached, no speech detected
 
-            time.sleep(0.5)  # Sleep for a short time before listening again
+                time.sleep(0.5)  # Sleep for a short time before listening again
+    except KeyboardInterrupt:
+        notetaker.flush()
+        print("exiting.")
 
 
 if __name__ == "__main__":
