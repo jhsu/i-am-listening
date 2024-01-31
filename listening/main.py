@@ -83,7 +83,7 @@ def main() -> None:
                     audio: sr.AudioData = recognizer.listen(
                         source, timeout=5.0, phrase_time_limit=5.0
                     )
-                    process_segment(
+                    process_segment_in_chunks(
                         audio,
                         sample_rate=sample_rate,
                         audio_model=audio_model,
