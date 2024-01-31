@@ -133,10 +133,9 @@ def process_segment_in_chunks(
         print("Processing audio segment in chunks...")
         for i in range(0, len(audio_np), chunk_size):
             chunk = audio_np[i:i+chunk_size]
-            result = openai.Audio.create(
-                file=chunk,
-                purpose="transcription",
-                language_model="en-US",
+            result = openai.client.audio.transcriptions.create(
+                audio=chunk,
+                model="en-US",
                 token=os.environ.get("OPENAI_API_KEY"),
             )
             if isinstance(result["text"], str):
