@@ -107,6 +107,7 @@ def process_segment_in_chunks(
     chunk_size: int = 4000,
     sample_rate: int = 16000,
     callback: Optional[Callable] = None,
+    use_openai: bool = False,
 ) -> None:
     audio_data = np.frombuffer(audio_segment.get_wav_data(), dtype=np.int16)
 
@@ -133,11 +134,14 @@ def process_segment_in_chunks(
         print("Processing audio segment in chunks...")
         for i in range(0, len(audio_np), chunk_size):
             chunk = audio_np[i:i+chunk_size]
-            result = openai.client.audio.transcriptions.create(
-                audio=chunk,
-                model="en-US",
-                token=os.environ.get("OPENAI_API_KEY"),
-            )
+            if use_openai:
+                result = openai.client.audio.transcriptions.create(
+                    audio=chunk,
+                    model="en-US",
+                    token=os.environ.get("OPENAI_API_KEY"),
+                )
+            else:
+                result = audio_model.transcribe(chunk, fp16=torch.cuda.is_available())
             if isinstance(result["text"], str):
                 text = result["text"].strip()
                 if callback and text != "":
