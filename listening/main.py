@@ -100,3 +100,41 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def process_segment_in_chunks(
+    audio_segment: sr.AudioData,
+    audio_model: Whisper,
+    chunk_size: int = 4000,
+    sample_rate: int = 16000,
+    callback: Optional[Callable] = None,
+) -> None:
+    audio_data = np.frombuffer(audio_segment.get_wav_data(), dtype=np.int16)
+
+    # Convert in-ram buffer to something the model can use directly without needing a temp file.
+    # Convert data from 16 bit wide integers to floating point with a width of 32 bits.
+    # Clamp the audio stream frequency to a PCM wavelength compatible default of 32768hz max.
+    audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+
+    # Ensure the audio is in the shape (channel, time), assuming mono audio
+    audio_data = np.expand_dims(audio_data, axis=0)
+
+    # Convert the numpy array to a torch tensor
+    audio_tensor = torch.tensor(audio_data, dtype=torch.float32)
+
+    # Use the pipeline to detect speech activity
+    speech_activity = pipeline({"waveform": audio_tensor, "sample_rate": sample_rate})
+
+    has_speech = any(
+        label == "SPEECH"
+        for segment, _, label in speech_activity.itertracks(yield_label=True)
+    )
+
+    if has_speech:
+        print("Processing audio segment in chunks...")
+        for i in range(0, len(audio_np), chunk_size):
+            chunk = audio_np[i:i+chunk_size]
+            result = audio_model.transcribe(chunk, fp16=torch.cuda.is_available())
+            if isinstance(result["text"], str):
+                text = result["text"].strip()
+                if callback and text != "":
+                    callback(text)
+                print(f"received text: '{text}'")
