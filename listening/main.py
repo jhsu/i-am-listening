@@ -3,6 +3,7 @@ import time
 from typing import Callable, Optional
 
 import numpy as np
+import openai
 import pyaudio  # noqa: F401
 import speech_recognition as sr
 import torch
@@ -132,7 +133,12 @@ def process_segment_in_chunks(
         print("Processing audio segment in chunks...")
         for i in range(0, len(audio_np), chunk_size):
             chunk = audio_np[i:i+chunk_size]
-            result = audio_model.transcribe(chunk, fp16=torch.cuda.is_available())
+            result = openai.Audio.create(
+                file=chunk,
+                purpose="transcription",
+                language_model="en-US",
+                token=os.environ.get("OPENAI_API_KEY"),
+            )
             if isinstance(result["text"], str):
                 text = result["text"].strip()
                 if callback and text != "":
