@@ -5,6 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 import openai
 import pyaudio  # noqa: F401
+import requests
 import speech_recognition as sr
 import torch
 from dotenv import load_dotenv
@@ -57,50 +58,30 @@ def process_segment(
             print(f"received text: '{text}'")
 
 
-def main() -> None:
-    recognizer: sr.Recognizer = sr.Recognizer()
-    sample_rate = 16000
-    mic: sr.Microphone = sr.Microphone(sample_rate=sample_rate)
+def send_audio_chunk(audio_bytes: bytes, server_url: str) -> None:
+    # Convert the audio chunk to bytes
+    # audio_bytes = audio_segment.tobytes()
 
-    notetaker = NoteTaker(
-        db_path=os.path.join(os.getcwd(), "notes.db"), debounce_time=1
+    files = {"file": audio_bytes}
+    response = requests.post(
+        server_url,
+        files=files,
+        headers={
+            "apikey": os.environ["SUPABASE_API_KEY"],
+            "Content-Type": "audio/wav",
+        },
     )
 
-    with mic as source:
-        recognizer.adjust_for_ambient_noise(source)
-        recognizer.dynamic_energy_threshold = True
+    print("sent audio chunk")
 
-    model = "tiny.en"
-
-    print("Listening...")
-
-    audio_model = load_model(model)
-
-    try:
-        while True:
-            with mic as source:
-                try:
-                    # Adjust the duration parameter to control how long it listens before processing
-                    audio: sr.AudioData = recognizer.listen(
-                        source, timeout=5.0, phrase_time_limit=5.0
-                    )
-                    process_segment_in_chunks(
-                        audio,
-                        sample_rate=sample_rate,
-                        audio_model=audio_model,
-                        callback=notetaker.append,
-                    )
-                except sr.WaitTimeoutError:
-                    pass  # Timeout reached, no speech detected
-
-                time.sleep(0.5)  # Sleep for a short time before listening again
-    except KeyboardInterrupt:
-        notetaker.flush()
-        print("exiting.")
+    # Check the response status code
+    if response.status_code == 200:
+        print("Audio chunk sent successfully")
+    else:
+        print(response)
+        print("Failed to send audio chunk")
 
 
-if __name__ == "__main__":
-    main()
 def process_segment_in_chunks(
     audio_segment: sr.AudioData,
     audio_model: Whisper,
@@ -132,18 +113,76 @@ def process_segment_in_chunks(
 
     if has_speech:
         print("Processing audio segment in chunks...")
-        for i in range(0, len(audio_np), chunk_size):
-            chunk = audio_np[i:i+chunk_size]
-            if use_openai:
-                result = openai.client.audio.transcriptions.create(
-                    audio=chunk,
-                    model="en-US",
-                    token=os.environ.get("OPENAI_API_KEY"),
-                )
-            else:
-                result = audio_model.transcribe(chunk, fp16=torch.cuda.is_available())
-            if isinstance(result["text"], str):
-                text = result["text"].strip()
-                if callback and text != "":
-                    callback(text)
-                print(f"received text: '{text}'")
+        # for i in range(0, len(audio_np), chunk_size):
+        # chunk = audio_np[i : i + chunk_size]
+
+        # chunk = sr.AudioData(
+        #     frame_data=audio_np[i * chunk_size : (i + 1) * chunk_size],
+        #     sample_rate=sample_rate,
+        #     sample_width=audio_segment.sample_width,
+        # )
+        send_audio_chunk(
+            audio_bytes=audio_segment.get_wav_data(),
+            server_url=os.environ["SUPABASE_HTTP_URL"],
+        )
+        # if use_openai:
+        #     result = openai.client.audio.transcriptions.create(
+        #         audio=chunk,
+        #         model="en-US",
+        #         token=os.environ.get("OPENAI_API_KEY"),
+        #     )
+        # else:
+        #     result = audio_model.transcribe(chunk, fp16=torch.cuda.is_available())
+        # if isinstance(result["text"], str):
+        #     text = result["text"].strip()
+        #     if callback and text != "":
+        #         callback(text)
+        #     print(f"received text: '{text}'")
+
+
+def main() -> None:
+    recognizer: sr.Recognizer = sr.Recognizer()
+    sample_rate = 16000
+    mic: sr.Microphone = sr.Microphone(sample_rate=sample_rate)
+
+    notetaker = NoteTaker(
+        db_path=os.path.join(os.getcwd(), "notes.db"), debounce_time=1
+    )
+
+    with mic as source:
+        recognizer.adjust_for_ambient_noise(source)
+        recognizer.dynamic_energy_threshold = True
+
+    model = "tiny.en"
+
+    print("Listening...")
+
+    audio_model = load_model(model)
+
+    try:
+        while True:
+            with mic as source:
+                try:
+                    # Adjust the duration parameter to control how long it listens before processing
+                    audio = recognizer.listen(
+                        source, timeout=None, phrase_time_limit=15.0
+                    )
+                    process_segment_in_chunks(
+                        audio,
+                        sample_rate=sample_rate,
+                        audio_model=audio_model,
+                        callback=notetaker.append,
+                    )
+                except sr.WaitTimeoutError:
+                    pass  # Timeout reached, no speech detected
+
+                time.sleep(0.5)  # Sleep for a short time before listening again
+    except KeyboardInterrupt:
+        print("exiting.")
+    finally:
+        notetaker.flush()
+        # close the mic
+
+
+if __name__ == "__main__":
+    main()
