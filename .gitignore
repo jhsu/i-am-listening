@@ -1,2 +1,5 @@
 .env
 *.db
+.aider*
+
+__pycache__

@@ -25,19 +25,11 @@ pyaudio = "*"
 python-dotenv = "*"
 numpy = "*"
 openai-whisper = "*"
-
-[torch_cpu]
-torch = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
-torchaudio = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
-torchvision = {index="pytorch_cpu", markers="sys_platform == 'win32'"}
-
-[torch_cu121]
-nvidia-cuda-runtime-cu12={version="*", index="nvidia"}
-torch = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
-torchaudio = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
-torchvision = {index="pytorch_cu121", markers="sys_platform == 'win32'"}
+transformers = "*"
+torch = {version = "*", index = "pytorch_cu121"}
+torchvision = {version = "*", index = "pytorch_cu121"}
+torchaudio = {version = "*", index = "pytorch_cu121"}
 
 [dev-packages]
-
-[requires]
-python_version = "3.11"
+# [requires]
+# python_version = "3.10.5"
